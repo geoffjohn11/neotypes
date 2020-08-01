@@ -7,10 +7,13 @@ import internal.syntax.async._
 import internal.syntax.stage._
 import mappers.{ExecutionMapper, ResultMapper}
 import types.QueryParam
-
 import org.neo4j.driver.{Record, Value}
+import org.neo4j.driver.reactive.{RxTransaction => NeoRxTransaction}
 import org.neo4j.driver.async.{AsyncTransaction => NeoAsyncTransaction}
 import org.neo4j.driver.exceptions.NoSuchRecordException
+import org.neo4j.driver.internal.shaded.reactor.core.publisher.Mono
+//import org.neo4j.driver.internal.shaded.reactor.core.publisher.{Flux, Mono}
+//import org.reactivestreams.Publisher
 
 import scala.collection.compat._
 import scala.jdk.CollectionConverters._
@@ -37,6 +40,16 @@ sealed trait Transaction[F[_]] {
 
   def single[T](query: String, params: Map[String, QueryParam] = Map.empty)
                (implicit resultMapper: ResultMapper[T]): F[T]
+
+  def stream[T, S[_]](query: String, params: Map[String, QueryParam] = Map.empty)
+                     (implicit S: Stream.Aux[S, F], resultMapper: ResultMapper[T]): S[T]
+
+  def commit: F[Unit]
+
+  def rollback: F[Unit]
+}
+
+sealed trait RxTransaction[F[_]] {
 
   def stream[T, S[_]](query: String, params: Map[String, QueryParam] = Map.empty)
                      (implicit S: Stream.Aux[S, F], resultMapper: ResultMapper[T]): S[T]
@@ -147,6 +160,53 @@ object Transaction {
     override final def rollback: F[Unit] =
       F.async[Unit] { cb =>
         transaction.rollbackAsync().acceptVoid(cb)
+      } guarantee { _ =>
+        lock.release
+      }
+  }
+}
+
+object RxTransaction {
+  private[neotypes] def apply[F[_]](F: Async[F], transaction: NeoRxTransaction)
+                                   (lock: F.Lock): RxTransaction[F] = new RxTransaction[F] {
+    private implicit final val FF: Async[F] = F
+
+//    private def recordToList(record: Record): List[(String, Value)] =
+//      record.fields.asScala.iterator.map(p => p.key -> p.value).toList
+
+
+    override final def stream[T, S[_]](query: String, params: Map[String,QueryParam])
+                                      (implicit S: Stream.Aux[S,F], resultMapper: ResultMapper[T]): S[T] =
+      S.fToS(
+        F.async { cb =>
+          val result = transaction.run(query, QueryParam.toJavaMap(params))
+
+          println(lock)
+          println(FF)
+          println(result)
+          println(cb)
+          //Flux.using(result.records(), (r: Publisher[Record]) =>  )
+
+          //Flux.from(result.records())
+            //.doOnError(th => cb(Left(th)))
+            //.doOnNext(record => cb(Right(record)))
+            //.then(Mono.from(result.consume()))
+          ()
+        }
+      )
+
+    override final def commit: F[Unit] =
+      F.async[Unit] { cb =>
+        println(cb)
+        Mono.from(transaction.commit()).acceptVoid(cb)
+      } guarantee { _ =>
+        lock.release
+      }
+
+    override final def rollback: F[Unit] =
+      F.async[Unit] { cb =>
+        println(cb)
+        Mono.from(transaction.rollback()).acceptVoid(cb)
       } guarantee { _ =>
         lock.release
       }

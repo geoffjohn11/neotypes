@@ -47,6 +47,13 @@ final class Driver[F[_]] private[neotypes] (private val driver: NeoDriver) {
       Session(F, session)(lock)
     }
 
+//  private[this] def createRxSession(config: SessionConfig)
+//                                 (implicit F: Async[F]): F[Session[F]] =
+//    F.makeLock.map { lock =>
+//      val session = driver.rxSession(config)
+//      RxSession(F, session)(lock)
+//    }
+
   /** Apply a unit of work to a read session
     *
     * @param sessionWork function that takes a Session[F] and returns an F[T]

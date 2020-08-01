@@ -18,6 +18,8 @@ val fs2Version = "2.4.2"
 val zioVersion = "1.0.0-RC21-2"
 val refinedVersion = "0.9.15"
 
+
+
 //lazy val compileScalastyle = taskKey[Unit]("compileScalastyle")
 
 val commonSettings = Seq(

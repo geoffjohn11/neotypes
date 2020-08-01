@@ -333,6 +333,15 @@ private[neotypes] object DeferredQuery {
         }
       )
 
+    //TODO really looks a lot like the other one
+    def apply[F[_]](rxSession: RxSession[F], config: NeoTransactionConfig = NeoTransactionConfig.empty)
+                   (implicit rm: ResultMapper[T], F: Async[F], S: Stream.Aux[S, F]): S[T] =
+      S.fToS(
+        rxSession.transaction(config).map { tx =>
+          S.onComplete(tx.stream(dq.query, dq.params))(tx.rollback)
+        }
+      )
+
     def apply[F[_]](tx: Transaction[F])
                    (implicit rm: ResultMapper[T], S: Stream.Aux[S, F]): S[T] =
       tx.stream(dq.query, dq.params)

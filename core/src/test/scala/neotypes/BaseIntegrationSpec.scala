@@ -30,6 +30,9 @@ abstract class BaseIntegrationSpec[F[_]](testkit: EffectTestkit[F]) extends Base
   private lazy final val neotypesSession =
     Session[F](F, driver.asyncSession())(fToT(F.makeLock))
 
+  private lazy final val neotypesSessionRx =
+    RxSession[F](F, driver.rxSession())(fToT(F.makeLock))
+
   private final def runQuery(query: String): Unit = {
     neo4jSession.writeTransaction(
       new neo4j.TransactionWork[Unit] {
@@ -54,6 +57,9 @@ abstract class BaseIntegrationSpec[F[_]](testkit: EffectTestkit[F]) extends Base
   }
 
   protected final def executeAsFuture[T](work: Session[F] => F[T]): Future[T] =
+    fToFuture(work(neotypesSession))
+
+  protected final def executeAsFutureRx[T](work: RxSession[F] => F[T]): Future[T] =
     fToFuture(work(neotypesSession))
 }
 

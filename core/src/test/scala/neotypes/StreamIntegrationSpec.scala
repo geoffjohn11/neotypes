@@ -23,7 +23,7 @@ final class StreamIntegrationSpec[S[_], F[_]](testkit: StreamTestkit[S, F]) exte
 
   it should s"catch exceptions inside the stream" in {
     recoverToSucceededIf[ClientException] {
-      executeAsFutureList { s =>
+      executeAsFutureListRx { s =>
         "match test return p.name"
           .query[String]
           .stream(s)

@@ -27,6 +27,9 @@ abstract class BaseStreamSpec[S[_], F[_]](testkit: StreamTestkit[S, F]) extends 
   protected final def executeAsFutureList[T](work: Session[F] => S[T]): Future[List[T]] =
     this.executeAsFuture(work andThen behaviour.streamToFList)
 
+  protected final def executeAsFutureListRx[T](work: RxSession[F] => S[T]): Future[List[T]] =
+    this.executeAsFutureRx(work andThen behaviour.streamToFList)
+
   protected implicit final val S: Stream.Aux[S, F] =
     behaviour.streamInstance
 }

@@ -3,6 +3,9 @@ package internal.syntax
 
 import java.util.concurrent.{CompletionException, CompletionStage}
 
+import org.neo4j.driver.internal.shaded.reactor.core.publisher.{Flux}
+import org.reactivestreams.Publisher
+
 private[neotypes] object stage {
   private final val defaultExHandler: PartialFunction[Throwable, Either[Throwable, Nothing]] = {
     case ex: Throwable => Left(ex)
@@ -24,6 +27,33 @@ private[neotypes] object stage {
           None.orNull
         }
       )
+
+    def accept[B](cb: Either[Throwable, B] => Unit)
+                 (f: A => Either[Throwable, B]): Unit =
+      acceptImpl(cb)(f)(defaultExHandler)
+
+    def acceptExceptionally[B](cb: Either[Throwable, B] => Unit)
+                              (f: A => Either[Throwable, B])
+                              (g: PartialFunction[Throwable, Either[Throwable, B]]): Unit =
+      acceptImpl(cb)(f)(g.orElse(defaultExHandler))
+
+    def acceptVoid(cb: Either[Throwable, Unit] => Unit)
+                  (implicit ev: A =:= Void): Unit = {
+      internal.utils.void(ev)
+      acceptImpl(cb)(_ => Right(()))(defaultExHandler)
+    }
+  }
+
+  implicit class PublisherStageOps[A](private val underlying: Publisher[A]) extends AnyVal {
+    private final def acceptImpl[B](cb: Either[Throwable, B] => Unit)
+                                   (f: A => Either[Throwable, B])
+                                   (g: Throwable => Either[Throwable, B]): Unit = {
+      internal.utils.void(
+        Flux.from(underlying)
+          .doOnError(th => cb(g(th)))
+          .doOnNext(a => cb(f(a)))
+      )
+    }
 
     def accept[B](cb: Either[Throwable, B] => Unit)
                  (f: A => Either[Throwable, B]): Unit =
